@@ -1,0 +1,11 @@
+{
+  "name": "lumio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lumio - beagyazhato AI chat widget magyar szolgaltato kkv-k weboldalara",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,49 @@
+{
+  "id": "agyipoloskastop",
+  "name": "Ágyi Poloska Stop",
+  "active": true,
+  "model": "claude-haiku-4-5-20251001",
+  "allowedOrigins": ["https://agyipoloskastop.hu", "https://www.agyipoloskastop.hu", "http://localhost:3000"],
+  "persona": {
+    "botName": "Anna",
+    "greeting": "Üdvözlöm! Ágyi poloskával kapcsolatban tudok segíteni. Miben állhatok rendelkezésére?",
+    "tone": "Udvarias, tegeződés nélkül, tömör. Nem használ felkiáltójelet és emojit.",
+    "suggestedQuestions": ["Mennyibe kerül az irtás?", "Hogyan zajlik a kezelés?", "Mennyi idő alatt tudnak jönni?"]
+  },
+  "theme": {
+    "accent": "#1b4d3e",
+    "position": "right",
+    "launcherLabel": "Kérdése van?"
+  },
+  "siteKnowledge": "",
+  "siteKnowledgeUpdatedAt": null,
+  "manualKnowledge": "Az Ágyi Poloska Stop budapesti és Pest megyei ágyipoloska-irtással foglalkozik. A kezelés vegyszeres irtásból áll, amit szükség esetén 2-3 hét múlva ellenőrző látogatás követ. A felmérés helyszíni, ez alapján adunk pontos árajánlatot. A kezelés napján a lakást 4-6 órára el kell hagyni, a textíliákat 60 fokon kell mosni előtte.",
+  "pricing": {
+    "enabled": true,
+    "currency": "HUF",
+    "rules": {
+      "alapdij": 15000,
+      "helyiseg_egyseg_ar": 8000,
+      "hetvegi_felar_szazalek": 20,
+      "surgossegi_felar_szazalek": 30,
+      "tobb_kezeles_kedvezmeny_szazalek": 10,
+      "minimum_ar": 20000
+    },
+    "disclaimer": "A megadott ár tájékoztató jellegű, a végleges árat helyszíni felmérés után tudjuk megadni."
+  },
+  "lead": {
+    "enabled": true,
+    "notifyEmail": "info@agyipoloskastop.hu",
+    "requiredFields": ["nev", "telefon"],
+    "privacyUrl": "https://agyipoloskastop.hu/adatkezeles"
+  },
+  "limits": {
+    "maxMessagesPerConversation": 25,
+    "maxMessagesPerIpPerHour": 30,
+    "maxKnowledgeChars": 60000
+  },
+  "escalation": {
+    "phone": "+36301234567",
+    "email": "info@agyipoloskastop.hu"
+  }
+}
