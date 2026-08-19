@@ -1,4 +1,4 @@
-import { ping } from "../lib/store.js";
+import { ping, get, smembers } from "../lib/store.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -23,6 +23,23 @@ export default async function handler(req, res) {
     status.ok = false;
     status.redis = "error";
     console.error("health check redis error:", err.message);
+  }
+
+  const checkTenant = req.query && req.query.checkTenant;
+  if (checkTenant) {
+    try {
+      const raw = await get(`tenant:${checkTenant}`);
+      const index = await smembers("tenants:index");
+      status.tenantCheck = {
+        key: `tenant:${checkTenant}`,
+        found: Boolean(raw),
+        length: raw ? String(raw).length : 0,
+        preview: raw ? String(raw).slice(0, 80) : null,
+        index,
+      };
+    } catch (err) {
+      status.tenantCheck = { error: err.message };
+    }
   }
 
   res.status(status.ok ? 200 : 503).json(status);
