@@ -1,9 +1,13 @@
 import { getTenant, publicTenantView } from "../lib/tenant.js";
 import { applyCors } from "../lib/cors.js";
+import { isAuthorized } from "../lib/auth.js";
 import { checkRateLimit, getClientIp } from "../lib/ratelimit.js";
 import { buildSystemPrompt } from "../lib/prompt.js";
 import { runChat } from "../lib/claude.js";
 import { hincrby } from "../lib/store.js";
+import { buildPricingTool, calculatePrice } from "../lib/pricing.js";
+import { saveLead, isValidHungarianPhone } from "../lib/leads.js";
+import { sendLeadNotification } from "../lib/email.js";
 
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY_MESSAGES = 10;
@@ -16,6 +20,77 @@ function currentYearMonth() {
 
 function sseWrite(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+function buildLeadTool(tenant) {
+  if (!tenant.lead.enabled) return null;
+  return {
+    name: "lead_rogzites",
+    description:
+      "Rögzíti az érdeklődő elérhetőségét, hogy felvegyék vele a kapcsolatot. Csak akkor hívd, ha a felhasználó hozzájárult az adatkezeléshez, és megadta legalább a nevét és telefonszámát.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nev: { type: "string", description: "Az érdeklődő neve" },
+        telefon: { type: "string", description: "Telefonszám" },
+        email: { type: "string", description: "E-mail cím (opcionális)" },
+        problema_osszefoglalo: { type: "string", description: "Rövid összefoglaló arról, mire van szüksége" },
+        varos: { type: "string", description: "Város (opcionális)" },
+        hozzajarulas: { type: "boolean", description: "A felhasználó elfogadta-e az adatkezelési tájékoztatót" },
+      },
+      required: ["nev", "telefon", "hozzajarulas"],
+    },
+  };
+}
+
+async function handleLeadCapture(tenant, input) {
+  if (!tenant.lead.enabled) {
+    return { error: "A kapcsolatfelvétel jelenleg nem elérhető ennél az ügyfélnél." };
+  }
+  if (!input.hozzajarulas) {
+    return { error: "Adatkezelési hozzájárulás nélkül nem rögzíthető az adat. Kérdezd meg a felhasználót, hogy elfogadja-e." };
+  }
+  const missing = ["nev", "telefon"].filter((f) => !input[f]);
+  if (missing.length) {
+    return { needs: missing };
+  }
+  if (!isValidHungarianPhone(input.telefon)) {
+    return { error: "A megadott telefonszám formátuma nem tűnik érvényesnek. Kérd meg, hogy adja meg újra." };
+  }
+
+  const lead = await saveLead(tenant.id, {
+    nev: input.nev,
+    telefon: input.telefon,
+    email: input.email || null,
+    problema_osszefoglalo: input.problema_osszefoglalo || null,
+    varos: input.varos || null,
+  });
+
+  if (tenant.lead.notifyEmail) {
+    try {
+      await sendLeadNotification({ to: tenant.lead.notifyEmail, tenantName: tenant.name, lead });
+    } catch (err) {
+      console.error(`lead email error tenant=${tenant.id}:`, err.message);
+    }
+  }
+
+  try {
+    await hincrby(`stats:${tenant.id}:${currentYearMonth()}`, "leads", 1);
+  } catch (err) {
+    console.error(`stats lead increment error tenant=${tenant.id}:`, err.message);
+  }
+
+  return { ok: true, uzenet: "Az adatokat rögzítettük, hamarosan felveszik Önnel a kapcsolatot." };
+}
+
+async function executeTool(tenant, name, input) {
+  if (name === "arkalkulacio") {
+    return calculatePrice(tenant, input || {});
+  }
+  if (name === "lead_rogzites") {
+    return handleLeadCapture(tenant, input || {});
+  }
+  return { error: "Ismeretlen eszköz." };
 }
 
 export default async function handler(req, res) {
@@ -35,8 +110,12 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Admin (bearer jelszóval hitelesített) kérés az admin élő próbához - ez sajat
+  // domainrol (PUBLIC_BASE_URL) hivja az API-t, nem a tenant allowedOrigins listajarol.
+  const isAdminRequest = isAuthorized(req);
+
   const corsAllowed = applyCors(req, res, tenant);
-  if (!corsAllowed) {
+  if (!corsAllowed && !isAdminRequest) {
     res.status(403).json({ error: "Ez a domain nincs engedélyezve ehhez az ügyfélhez." });
     return;
   }
@@ -52,11 +131,13 @@ export default async function handler(req, res) {
   }
 
   const ip = getClientIp(req);
-  const rate = await checkRateLimit({
-    tenantId: tenant.id,
-    ip,
-    maxPerHour: tenant.limits.maxMessagesPerIpPerHour,
-  });
+  const rate = isAdminRequest
+    ? { allowed: true }
+    : await checkRateLimit({
+        tenantId: tenant.id,
+        ip,
+        maxPerHour: tenant.limits.maxMessagesPerIpPerHour,
+      });
   if (!rate.allowed) {
     res.status(429).json({
       error: "Túl sok üzenetet küldött rövid idő alatt. Kérjük, próbálja később, vagy hívja ezt a számot: " +
@@ -111,6 +192,8 @@ export default async function handler(req, res) {
     Connection: "keep-alive",
   });
 
+  const tools = [buildPricingTool(tenant), buildLeadTool(tenant)].filter(Boolean);
+
   let streamFailed = false;
   let result;
   try {
@@ -119,8 +202,9 @@ export default async function handler(req, res) {
       model: tenant.model,
       system,
       messages: trimmedMessages,
-      tools: undefined,
+      tools: tools.length ? tools : undefined,
       maxTokens: MAX_TOKENS,
+      executeTool: (name, input) => executeTool(tenant, name, input),
       onTextDelta: (text) => sseWrite(res, { type: "delta", text }),
     });
   } catch (err) {

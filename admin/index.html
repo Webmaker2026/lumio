@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lumio - Admin</title>
+<style>
+  :root{ --accent:#1b4d3e; --bg:#faf9f7; --card:#fff; --border:#e7e3dc; --text:#232320; --muted:#7a7a76; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14.5px;line-height:1.5;}
+  h1{font-size:18px;margin:0;}
+  h2{font-size:15px;margin:0 0 12px;}
+  a{color:var(--accent);}
+  button{font:inherit;cursor:pointer;}
+  input,textarea,select{font:inherit;padding:7px 9px;border:1px solid var(--border);border-radius:6px;width:100%;background:#fff;color:var(--text);}
+  textarea{resize:vertical;min-height:70px;}
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:3px;margin-top:10px;}
+  label:first-child{margin-top:0;}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 14px;}
+  .btn:hover{opacity:.92;}
+  .btn.secondary{background:#fff;color:var(--text);border:1px solid var(--border);}
+  .btn.danger{background:#a83a3a;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .checkrow{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .checkrow input{width:auto;}
+  .checkrow label{margin:0;}
+
+  #login-view{max-width:340px;margin:120px auto;padding:28px;background:var(--card);border:1px solid var(--border);border-radius:10px;}
+  #login-view h1{margin-bottom:16px;}
+  #login-error{color:#a83a3a;font-size:13px;margin-top:8px;min-height:16px;}
+
+  #app-view{display:none;height:100vh;}
+  .layout{display:flex;height:100vh;}
+  .sidebar{width:260px;flex-shrink:0;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;}
+  .sidebar-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .tenant-list{flex:1;overflow-y:auto;}
+  .tenant-item{padding:11px 16px;border-bottom:1px solid #f2f0eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+  .tenant-item:hover{background:#f5f4f0;}
+  .tenant-item.selected{background:#eef1ef;border-left:3px solid var(--accent);}
+  .tenant-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dot.active{background:#3a8a5c;}
+  .dot.inactive{background:#c4c0b8;}
+  .sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);}
+
+  .main{flex:1;overflow-y:auto;padding:24px 32px;}
+  .empty-state{color:var(--muted);margin-top:60px;text-align:center;}
+
+  .tenant-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .tenant-header h1 .id{color:var(--muted);font-weight:400;font-size:14px;}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;flex-wrap:wrap;}
+  .tab-btn{background:none;border:none;padding:9px 12px;border-bottom:2px solid transparent;color:var(--muted);}
+  .tab-btn.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600;}
+  .tab-panel{display:none;max-width:640px;}
+  .tab-panel.active{display:block;}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:14px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px;}
+  .charcount{font-size:12px;color:var(--muted);text-align:right;}
+  .save-bar{position:sticky;bottom:0;background:var(--bg);padding:14px 0;display:flex;gap:8px;border-top:1px solid var(--border);margin-top:8px;}
+  #save-status{font-size:13px;color:var(--muted);align-self:center;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;}
+
+  .chat-box{border:1px solid var(--border);border-radius:8px;background:#fff;height:360px;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+  .chat-msg{max-width:80%;padding:7px 11px;border-radius:8px;white-space:pre-wrap;}
+  .chat-msg.user{align-self:flex-end;background:#eef1ef;}
+  .chat-msg.assistant{align-self:flex-start;background:#f5f4f0;}
+  .chat-composer{display:flex;gap:8px;}
+  .warn{background:#fbf3e3;border:1px solid #edd9a8;color:#7a5c12;border-radius:6px;padding:8px 10px;font-size:12.5px;margin-bottom:10px;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;}
+  .stat-card .num{font-size:24px;font-weight:700;}
+  .stat-card .label{font-size:12.5px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+  <div id="login-view">
+    <h1>Lumio admin</h1>
+    <form id="login-form">
+      <label for="login-password">Admin jelszó</label>
+      <input id="login-password" type="password" autocomplete="current-password" required />
+      <button class="btn" type="submit" style="margin-top:14px;width:100%;">Belépés</button>
+      <div id="login-error"></div>
+    </form>
+  </div>
+
+  <div id="app-view">
+    <div class="layout">
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h1>Lumio</h1>
+          <button class="btn secondary" id="new-tenant-btn" title="Új ügyfél">+ Új</button>
+        </div>
+        <div class="tenant-list" id="tenant-list"></div>
+        <div class="sidebar-footer">
+          <button class="btn secondary" id="logout-btn" style="width:100%;">Kijelentkezés</button>
+        </div>
+      </div>
+
+      <div class="main" id="main">
+        <div class="empty-state" id="empty-state">Válassz egy ügyfelet a listából, vagy hozz létre újat.</div>
+
+        <div id="tenant-editor" style="display:none;">
+          <div class="tenant-header">
+            <h1><span id="th-name">-</span> <span class="id" id="th-id"></span></h1>
+            <div class="row">
+              <button class="btn secondary" id="copy-embed-btn">Beágyazó kód másolása</button>
+              <button class="btn danger" id="delete-tenant-btn">Törlés</button>
+            </div>
+          </div>
+
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="alapadatok">Alapadatok</button>
+            <button class="tab-btn" data-tab="tudasanyag">Tudásanyag</button>
+            <button class="tab-btn" data-tab="arazas">Árazás</button>
+            <button class="tab-btn" data-tab="lead">Lead</button>
+            <button class="tab-btn" data-tab="limitek">Limitek</button>
+            <button class="tab-btn" data-tab="probal">Élő próba</button>
+            <button class="tab-btn" data-tab="leadek">Leadek</button>
+            <button class="tab-btn" data-tab="statisztika">Statisztika</button>
+          </div>
+
+          <form id="tenant-form">
+            <div class="tab-panel active" data-panel="alapadatok">
+              <div class="card">
+                <label for="f-id">Tenant id (egyedi, kisbetű/szám/kötőjel)</label>
+                <input id="f-id" data-path="id" required pattern="[a-z0-9-]+" />
+                <label for="f-name">Ügyfél neve</label>
+                <input id="f-name" data-path="name" required />
+                <div class="checkrow">
+                  <input type="checkbox" id="f-active" data-path="active" data-type="boolean" />
+                  <label for="f-active">Aktív</label>
+                </div>
+                <label for="f-model">Modell</label>
+                <input id="f-model" data-path="model" />
+                <label for="f-origins">Engedélyezett domainek (soronként egy, pl. https://pelda.hu)</label>
+                <textarea id="f-origins" data-path="allowedOrigins" data-type="list"></textarea>
+              </div>
+              <div class="card">
+                <h2>Megjelenés és hangnem</h2>
+                <label for="f-botname">Bot neve</label>
+                <input id="f-botname" data-path="persona.botName" />
+                <label for="f-greeting">Üdvözlő üzenet</label>
+                <textarea id="f-greeting" data-path="persona.greeting"></textarea>
+                <label for="f-tone">Hangnem leírása</label>
+                <textarea id="f-tone" data-path="persona.tone"></textarea>
+                <label for="f-questions">Ajánlott kérdések (soronként egy)</label>
+                <textarea id="f-questions" data-path="persona.suggestedQuestions" data-type="list"></textarea>
+                <label for="f-accent">Szín (accent, hex)</label>
+                <input id="f-accent" data-path="theme.accent" type="text" placeholder="#1b4d3e" />
+                <label for="f-position">Widget pozíció</label>
+                <select id="f-position" data-path="theme.position">
+                  <option value="right">Jobb</option>
+                  <option value="left">Bal</option>
+                </select>
+                <label for="f-launcherlabel">Launcher felirat</label>
+                <input id="f-launcherlabel" data-path="theme.launcherLabel" />
+              </div>
+              <div class="card">
+                <h2>Elérhetőség (eszkalációhoz)</h2>
+                <label for="f-phone">Telefon</label>
+                <input id="f-phone" data-path="escalation.phone" />
+                <label for="f-email">E-mail</label>
+                <input id="f-email" data-path="escalation.email" />
+              </div>
+            </div>
+
+            <div class="tab-panel" data-panel="tudasanyag">
+              <div class="card">
+                <h2>Weboldal beolvasása</h2>
+                <label for="crawl-url">Kezdő URL</label>
+                <input id="crawl-url" type="url" placeholder="https://pelda.hu" />
+                <button type="button" class="btn" id="crawl-btn" style="margin-top:10px;">Weboldal beolvasása</button>
+                <div class="hint" id="crawl-result"></div>
+                <div class="hint" id="site-knowledge-info"></div>
+              </div>
+              <div class="card">
+                <h2>Kézi tudásanyag</h2>
+                <textarea id="f-manual" data-path="manualKnowledge" rows="10"></textarea>
+                <div class="charcount" id="manual-charcount"></div>
+              </div>
+            </div>
+
+            <div class="tab-panel" data-panel="arazas">
+              <div class="card">
+                <div class="checkrow">
+                  <input type="checkbox" id="f-pricing-enabled" data-path="pricing.enabled" data-type="boolean" />
+                  <label for="f-pricing-enabled">Árkalkuláció engedélyezve</label>
+                </div>
+                <label for="f-currency">Pénznem</label>
+                <input id="f-currency" data-path="pricing.currency" />
+                <label for="f-rules">Árazási szabályok (JSON)</label>
+                <textarea id="f-rules" data-path="pricing.rules" data-type="json" rows="8" style="font-family:monospace;"></textarea>
+                <label for="f-disclaimer">Záradék szövege</label>
+                <textarea id="f-disclaimer" data-path="pricing.disclaimer"></textarea>
+              </div>
+            </div>
+
+            <div class="tab-panel" data-panel="lead">
+              <div class="card">
+                <div class="checkrow">
+                  <input type="checkbox" id="f-lead-enabled" data-path="lead.enabled" data-type="boolean" />
+                  <label for="f-lead-enabled">Lead rögzítés engedélyezve</label>
+                </div>
+                <label for="f-notifyemail">Értesítési e-mail cím</label>
+                <input id="f-notifyemail" data-path="lead.notifyEmail" />
+                <label for="f-requiredfields">Kötelező mezők (soronként egy)</label>
+                <textarea id="f-requiredfields" data-path="lead.requiredFields" data-type="list"></textarea>
+                <label for="f-privacyurl">Adatkezelési tájékoztató URL</label>
+                <input id="f-privacyurl" data-path="lead.privacyUrl" />
+              </div>
+            </div>
+
+            <div class="tab-panel" data-panel="limitek">
+              <div class="card">
+                <label for="f-maxconv">Max üzenet / beszélgetés</label>
+                <input id="f-maxconv" data-path="limits.maxMessagesPerConversation" data-type="number" type="number" />
+                <label for="f-maxip">Max üzenet / IP / óra</label>
+                <input id="f-maxip" data-path="limits.maxMessagesPerIpPerHour" data-type="number" type="number" />
+                <label for="f-maxknowledge">Max tudásanyag karakter</label>
+                <input id="f-maxknowledge" data-path="limits.maxKnowledgeChars" data-type="number" type="number" />
+              </div>
+            </div>
+
+            <div class="save-bar">
+              <button type="submit" class="btn" id="save-btn">Mentés</button>
+              <span id="save-status"></span>
+            </div>
+          </form>
+
+          <div class="tab-panel" data-panel="probal">
+            <div class="warn">Ez az éles beszélgetési motort használja: ha itt lead-et rögzítesz teszként, valódi e-mail megy ki és megjelenik a Leadek listában.</div>
+            <div class="chat-box" id="test-chat-box"></div>
+            <form class="chat-composer" id="test-chat-form">
+              <input id="test-chat-input" placeholder="Írj egy tesztüzenetet..." autocomplete="off" />
+              <button class="btn" type="submit">Küldés</button>
+            </form>
+          </div>
+
+          <div class="tab-panel" data-panel="leadek">
+            <div class="card">
+              <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+                <h2 style="margin:0;">Leadek</h2>
+                <button class="btn secondary" id="export-leads-btn">CSV export</button>
+              </div>
+              <table id="leads-table">
+                <thead><tr><th>Dátum</th><th>Név</th><th>Telefon</th><th>E-mail</th><th>Város</th><th>Összefoglaló</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <div class="hint" id="leads-empty" style="display:none;">Még nincs lead.</div>
+            </div>
+          </div>
+
+          <div class="tab-panel" data-panel="statisztika">
+            <div class="card">
+              <div class="row" style="margin-bottom:14px;">
+                <label style="margin:0;" for="stats-month">Hónap</label>
+                <input id="stats-month" type="month" />
+              </div>
+              <div class="stat-grid">
+                <div class="stat-card"><div class="num" id="stat-messages">-</div><div class="label">Üzenet</div></div>
+                <div class="stat-card"><div class="num" id="stat-tokens">-</div><div class="label">Token (becsült)</div></div>
+                <div class="stat-card"><div class="num" id="stat-leads">-</div><div class="label">Lead</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOKEN_KEY = "lumio_admin_token";
+  var API_BASE = window.location.origin;
+
+  var state = {
+    token: sessionStorage.getItem(TOKEN_KEY) || "",
+    tenants: [],
+    selectedId: null,
+    currentTenantFull: null,
+    testMessages: [],
+  };
+
+  var loginView = document.getElementById("login-view");
+  var appView = document.getElementById("app-view");
+  var loginForm = document.getElementById("login-form");
+  var loginError = document.getElementById("login-error");
+
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = Object.assign({}, opts.headers || {}, { Authorization: "Bearer " + state.token });
+    if (opts.body && !(opts.body instanceof FormData)) headers["content-type"] = "application/json";
+    return fetch(API_BASE + path, Object.assign({}, opts, { headers: headers })).then(function (res) {
+      if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        state.token = "";
+        showLogin("A munkamenet lejárt, jelentkezz be újra.");
+        throw new Error("unauthorized");
+      }
+      return res.json().then(function (data) {
+        if (!res.ok) throw new Error(data.error || "Hiba történt.");
+        return data;
+      });
+    });
+  }
+
+  function showLogin(err) {
+    loginView.style.display = "block";
+    appView.style.display = "none";
+    if (err) loginError.textContent = err;
+  }
+
+  function showApp() {
+    loginView.style.display = "none";
+    appView.style.display = "block";
+    loadTenantList();
+  }
+
+  loginForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var pw = document.getElementById("login-password").value;
+    state.token = pw;
+    loginError.textContent = "";
+    api("/api/tenants")
+      .then(function (tenants) {
+        sessionStorage.setItem(TOKEN_KEY, state.token);
+        state.tenants = tenants;
+        showApp();
+      })
+      .catch(function () {
+        loginError.textContent = "Hibás jelszó vagy a szerver nem elérhető.";
+      });
+  });
+
+  document.getElementById("logout-btn").addEventListener("click", function () {
+    sessionStorage.removeItem(TOKEN_KEY);
+    state.token = "";
+    showLogin();
+  });
+
+  // --- tenant lista ---
+  function loadTenantList() {
+    api("/api/tenants").then(function (tenants) {
+      state.tenants = tenants;
+      renderTenantList();
+    });
+  }
+
+  function renderTenantList() {
+    var list = document.getElementById("tenant-list");
+    list.innerHTML = "";
+    state.tenants.forEach(function (t) {
+      var item = document.createElement("div");
+      item.className = "tenant-item" + (t.id === state.selectedId ? " selected" : "");
+      item.innerHTML =
+        '<span><span class="dot ' + (t.active ? "active" : "inactive") + '"></span> ' + escapeHtml(t.name || t.id) + "</span>";
+      item.addEventListener("click", function () {
+        selectTenant(t.id);
+      });
+      list.appendChild(item);
+    });
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = String(s == null ? "" : s);
+    return d.innerHTML;
+  }
+
+  document.getElementById("new-tenant-btn").addEventListener("click", function () {
+    state.selectedId = null;
+    state.currentTenantFull = null;
+    document.getElementById("empty-state").style.display = "none";
+    document.getElementById("tenant-editor").style.display = "block";
+    document.getElementById("th-name").textContent = "Új ügyfél";
+    document.getElementById("th-id").textContent = "";
+    populateForm({
+      active: true,
+      model: "claude-haiku-4-5-20251001",
+      allowedOrigins: [],
+      persona: { botName: "Asszisztens", greeting: "Üdvözlöm! Miben segíthetek?", tone: "Udvarias, tömör.", suggestedQuestions: [] },
+      theme: { accent: "#1b4d3e", position: "right", launcherLabel: "Kérdése van?" },
+      manualKnowledge: "",
+      pricing: { enabled: false, currency: "HUF", rules: {}, disclaimer: "" },
+      lead: { enabled: false, notifyEmail: "", requiredFields: ["nev", "telefon"], privacyUrl: "" },
+      limits: { maxMessagesPerConversation: 25, maxMessagesPerIpPerHour: 30, maxKnowledgeChars: 60000 },
+      escalation: { phone: "", email: "" },
+    });
+    document.getElementById("f-id").removeAttribute("readonly");
+    renderTenantList();
+    switchTab("alapadatok");
+  });
+
+  function selectTenant(id) {
+    api("/api/tenants?id=" + encodeURIComponent(id)).then(function (tenant) {
+      state.selectedId = id;
+      state.currentTenantFull = tenant;
+      state.testMessages = [];
+      document.getElementById("test-chat-box").innerHTML = "";
+      document.getElementById("empty-state").style.display = "none";
+      document.getElementById("tenant-editor").style.display = "block";
+      document.getElementById("th-name").textContent = tenant.name || tenant.id;
+      document.getElementById("th-id").textContent = tenant.id;
+      populateForm(tenant);
+      document.getElementById("f-id").setAttribute("readonly", "readonly");
+      renderTenantList();
+      loadLeads();
+      loadStats();
+    });
+  }
+
+  // --- form binding ---
+  function getPath(obj, path) {
+    return path.split(".").reduce(function (o, k) { return o == null ? undefined : o[k]; }, obj);
+  }
+  function setPath(obj, path, value) {
+    var keys = path.split(".");
+    var cur = obj;
+    for (var i = 0; i < keys.length - 1; i++) {
+      if (typeof cur[keys[i]] !== "object" || cur[keys[i]] === null) cur[keys[i]] = {};
+      cur = cur[keys[i]];
+    }
+    cur[keys[keys.length - 1]] = value;
+  }
+
+  function populateForm(tenant) {
+    document.querySelectorAll("[data-path]").forEach(function (el) {
+      var val = getPath(tenant, el.dataset.path);
+      var type = el.dataset.type || "text";
+      if (type === "boolean") el.checked = Boolean(val);
+      else if (type === "list") el.value = Array.isArray(val) ? val.join("\n") : "";
+      else if (type === "json") el.value = val ? JSON.stringify(val, null, 2) : "{}";
+      else el.value = val == null ? "" : val;
+    });
+    updateManualCharcount();
+    var updatedAt = tenant.siteKnowledgeUpdatedAt;
+    document.getElementById("site-knowledge-info").textContent = updatedAt
+      ? "Utolsó beolvasás: " + new Date(updatedAt).toLocaleString("hu-HU") + " (" + (tenant.siteKnowledge || "").length + " karakter)"
+      : "Még nem lett beolvasva weboldal.";
+    document.getElementById("crawl-result").textContent = "";
+  }
+
+  function collectForm() {
+    var tenant = state.currentTenantFull ? JSON.parse(JSON.stringify(state.currentTenantFull)) : {};
+    var errors = [];
+    document.querySelectorAll("[data-path]").forEach(function (el) {
+      var type = el.dataset.type || "text";
+      var val;
+      if (type === "boolean") val = el.checked;
+      else if (type === "number") val = el.value === "" ? undefined : Number(el.value);
+      else if (type === "list") val = el.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      else if (type === "json") {
+        try {
+          val = JSON.parse(el.value || "{}");
+        } catch (e) {
+          errors.push(el.dataset.path + ": érvénytelen JSON");
+          return;
+        }
+      } else val = el.value;
+      setPath(tenant, el.dataset.path, val);
+    });
+    if (errors.length) throw new Error(errors.join(", "));
+    return tenant;
+  }
+
+  document.getElementById("f-manual").addEventListener("input", updateManualCharcount);
+  function updateManualCharcount() {
+    var el = document.getElementById("f-manual");
+    var max = document.getElementById("f-maxknowledge").value || 60000;
+    document.getElementById("manual-charcount").textContent = el.value.length + " / " + max + " karakter";
+  }
+
+  document.getElementById("tenant-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var statusEl = document.getElementById("save-status");
+    var tenant;
+    try {
+      tenant = collectForm();
+    } catch (err) {
+      statusEl.textContent = "Hiba: " + err.message;
+      return;
+    }
+    statusEl.textContent = "Mentés...";
+    api("/api/tenants", { method: "POST", body: JSON.stringify(tenant) })
+      .then(function (saved) {
+        state.currentTenantFull = saved;
+        state.selectedId = saved.id;
+        statusEl.textContent = "Elmentve.";
+        document.getElementById("f-id").setAttribute("readonly", "readonly");
+        document.getElementById("th-name").textContent = saved.name || saved.id;
+        document.getElementById("th-id").textContent = saved.id;
+        loadTenantList();
+        setTimeout(function () { statusEl.textContent = ""; }, 2500);
+      })
+      .catch(function (err) {
+        statusEl.textContent = "Hiba: " + err.message;
+      });
+  });
+
+  document.getElementById("delete-tenant-btn").addEventListener("click", function () {
+    if (!state.selectedId) return;
+    if (!confirm("Biztosan törlöd a(z) \"" + state.selectedId + "\" ügyfelet? Ez nem visszavonható.")) return;
+    api("/api/tenants?id=" + encodeURIComponent(state.selectedId), { method: "DELETE" }).then(function () {
+      state.selectedId = null;
+      state.currentTenantFull = null;
+      document.getElementById("tenant-editor").style.display = "none";
+      document.getElementById("empty-state").style.display = "block";
+      loadTenantList();
+    });
+  });
+
+  document.getElementById("copy-embed-btn").addEventListener("click", function () {
+    if (!state.selectedId) return;
+    var snippet = '<script src="' + API_BASE + '/widget.js" data-client="' + state.selectedId + '" defer><' + "/script>";
+    navigator.clipboard.writeText(snippet).then(function () {
+      var btn = document.getElementById("copy-embed-btn");
+      var original = btn.textContent;
+      btn.textContent = "Másolva!";
+      setTimeout(function () { btn.textContent = original; }, 1800);
+    });
+  });
+
+  // --- tabok ---
+  document.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () { switchTab(btn.dataset.tab); });
+  });
+  function switchTab(name) {
+    document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.toggle("active", b.dataset.tab === name); });
+    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.toggle("active", p.dataset.panel === name); });
+  }
+
+  // --- crawler ---
+  document.getElementById("crawl-btn").addEventListener("click", function () {
+    if (!state.selectedId) { alert("Előbb mentsd el az ügyfelet."); return; }
+    var url = document.getElementById("crawl-url").value.trim();
+    if (!url) return;
+    var btn = document.getElementById("crawl-btn");
+    var resultEl = document.getElementById("crawl-result");
+    btn.disabled = true;
+    resultEl.textContent = "Beolvasás folyamatban, ez eltarthat egy percig...";
+    api("/api/crawl", { method: "POST", body: JSON.stringify({ tenantId: state.selectedId, startUrl: url }) })
+      .then(function (res) {
+        resultEl.textContent = res.pageCount + " oldal beolvasva, " + res.totalChars + " karakter" + (res.truncated ? " (a limit miatt levágva)" : "") + ".";
+        return api("/api/tenants?id=" + encodeURIComponent(state.selectedId));
+      })
+      .then(function (tenant) {
+        state.currentTenantFull = tenant;
+        document.getElementById("site-knowledge-info").textContent =
+          "Utolsó beolvasás: " + new Date(tenant.siteKnowledgeUpdatedAt).toLocaleString("hu-HU") + " (" + (tenant.siteKnowledge || "").length + " karakter)";
+      })
+      .catch(function (err) {
+        resultEl.textContent = "Hiba: " + err.message;
+      })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  // --- leadek ---
+  function loadLeads() {
+    if (!state.selectedId) return;
+    api("/api/leads?tenantId=" + encodeURIComponent(state.selectedId)).then(function (leads) {
+      state.leads = leads;
+      renderLeads(leads);
+    });
+  }
+
+  function renderLeads(leads) {
+    var tbody = document.querySelector("#leads-table tbody");
+    tbody.innerHTML = "";
+    document.getElementById("leads-empty").style.display = leads.length ? "none" : "block";
+    leads.forEach(function (l) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        "<td>" + escapeHtml(l.createdAt ? new Date(l.createdAt).toLocaleString("hu-HU") : "") + "</td>" +
+        "<td>" + escapeHtml(l.nev) + "</td>" +
+        "<td>" + escapeHtml(l.telefon) + "</td>" +
+        "<td>" + escapeHtml(l.email) + "</td>" +
+        "<td>" + escapeHtml(l.varos) + "</td>" +
+        "<td>" + escapeHtml(l.problema_osszefoglalo) + "</td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("export-leads-btn").addEventListener("click", function () {
+    var leads = state.leads || [];
+    var headers = ["createdAt", "nev", "telefon", "email", "varos", "problema_osszefoglalo"];
+    var rows = [headers.join(",")];
+    leads.forEach(function (l) {
+      rows.push(headers.map(function (h) { return csvEscape(l[h] == null ? "" : l[h]); }).join(","));
+    });
+    var blob = new Blob([rows.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "leads-" + state.selectedId + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  function csvEscape(v) {
+    var s = String(v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? '"' + s + '"' : s;
+  }
+
+  // --- statisztika ---
+  var monthInput = document.getElementById("stats-month");
+  var now = new Date();
+  monthInput.value = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+  monthInput.addEventListener("change", loadStats);
+
+  function loadStats() {
+    if (!state.selectedId) return;
+    var month = monthInput.value;
+    api("/api/stats?tenantId=" + encodeURIComponent(state.selectedId) + "&month=" + encodeURIComponent(month)).then(function (s) {
+      document.getElementById("stat-messages").textContent = s.messages;
+      document.getElementById("stat-tokens").textContent = s.tokens;
+      document.getElementById("stat-leads").textContent = s.leads;
+    });
+  }
+
+  // --- elo proba chat ---
+  var testChatForm = document.getElementById("test-chat-form");
+  var testChatBox = document.getElementById("test-chat-box");
+  testChatForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = document.getElementById("test-chat-input");
+    var text = input.value.trim();
+    if (!text || !state.selectedId) return;
+    input.value = "";
+    appendTestMsg("user", text);
+    state.testMessages.push({ role: "user", content: text });
+
+    var assistantEl = null;
+    var assistantText = "";
+
+    fetch(API_BASE + "/api/chat?tenantId=" + encodeURIComponent(state.selectedId), {
+      method: "POST",
+      headers: { "content-type": "application/json", Authorization: "Bearer " + state.token },
+      body: JSON.stringify({ tenantId: state.selectedId, conversationId: "admin-test", messages: state.testMessages }),
+    })
+      .then(function (res) {
+        if (!res.body) return;
+        var reader = res.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = "";
+        function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) return;
+            buffer += decoder.decode(r.value, { stream: true });
+            var idx;
+            while ((idx = buffer.indexOf("\n\n")) !== -1) {
+              var raw = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + 2);
+              var line = raw.split("\n").filter(function (l) { return l.indexOf("data:") === 0; })[0];
+              if (!line) continue;
+              var jsonStr = line.slice(5).trim();
+              if (!jsonStr) continue;
+              var evt;
+              try { evt = JSON.parse(jsonStr); } catch (e) { continue; }
+              if (evt.type === "delta") {
+                if (!assistantEl) assistantEl = appendTestMsg("assistant", "");
+                assistantText += evt.text;
+                assistantEl.textContent = assistantText;
+                testChatBox.scrollTop = testChatBox.scrollHeight;
+              }
+            }
+            return pump();
+          });
+        }
+        return pump();
+      })
+      .then(function () {
+        if (assistantText) state.testMessages.push({ role: "assistant", content: assistantText });
+      });
+  });
+
+  function appendTestMsg(role, text) {
+    var el = document.createElement("div");
+    el.className = "chat-msg " + role;
+    el.textContent = text;
+    testChatBox.appendChild(el);
+    testChatBox.scrollTop = testChatBox.scrollHeight;
+    return el;
+  }
+
+  // --- indulas ---
+  if (state.token) {
+    api("/api/tenants")
+      .then(function (tenants) {
+        state.tenants = tenants;
+        showApp();
+      })
+      .catch(function () { showLogin(); });
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
