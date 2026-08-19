@@ -6,7 +6,15 @@ export default async function handler(req, res) {
     return;
   }
 
-  const status = { ok: true, service: "lumio", redis: "unknown" };
+  const status = {
+    ok: true,
+    service: "lumio",
+    redis: "unknown",
+    env: {
+      UPSTASH_REDIS_REST_URL: Boolean(process.env.UPSTASH_REDIS_REST_URL),
+      UPSTASH_REDIS_REST_TOKEN: Boolean(process.env.UPSTASH_REDIS_REST_TOKEN),
+    },
+  };
 
   try {
     const result = await ping();
